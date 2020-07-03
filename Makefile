@@ -19,7 +19,7 @@ HAS_GOLANGCI_LINT := $(shell command -v golangci-lint;)
 GOLANGCI_VERSION_CHECK := $(shell golangci-lint --version | grep -oh $(GOLANGCI_LINT_VERSION);)
 
 DOCKER_REGISTRY ?= quay.io
-DOCKER_REPO ?= $(DOCKER_REGISTRY)/ouzi/$(APP_NAME)
+DOCKER_REPO ?= $(DOCKER_REGISTRY)/ouzi
 DOCKER_IMAGE ?= $(APP_NAME)
 
 SRC = $(shell find . -type f -name '*.go' -not -path "./vendor/*")

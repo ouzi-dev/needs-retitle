@@ -2,7 +2,8 @@
 
 - [Overview](#overview)
 - [Configuration](#configuration)
-- [Build and deploy](#build-and-deploy)
+- [Build](#build)
+- [Deploy](#deploy)
 
 ## Overview
 
@@ -45,6 +46,46 @@ You'll need to add new things to your prow `plugins.yaml` file:
       - issue_comment
   ```
 
-## Build and deploy
+* Add the new label to `missingLabels` in the tide settings (in prow usually in `config.yaml`), that way the label `needs-retitle` will stop tide from merging the pull requests, example:
 
-WIP
+  ```
+  tide:
+    sync_period: 1m
+    merge_method:
+      my-org: squash
+    pr_status_base_urls:
+      "*": https://prow.my-host.com/pr
+    blocker_label: tide/merge-blocker
+    squash_label: tide/merge-method-squash
+    rebase_label: tide/merge-method-rebase
+    merge_label: tide/merge-method-merge
+    context_options:
+      from-branch-protection: true
+      skip-unknown-contexts: false
+    queries:
+      - orgs:
+          - my-org
+        labels:
+          - lgtm
+          - approved
+        missingLabels:
+          - do-not-merge
+          - do-not-merge/hold
+          - do-not-merge/work-in-progress
+          - needs-rebase
+          - do-not-merge/invalid-owners-file
+          - needs-retitle
+  ```
+
+## Build 
+
+* To make just the binary run: `make build`
+* To build an specific version run: `VERSION=v0.1.0 make build`
+* To run the tests run: `make test`
+* To build the docker image run: `make docker-build`
+
+## Deploy
+
+You can find manifest to use as example to deploy the plugin in [deploy](./deploy)
+
+__Remember to change the version, the manifests are using as version `canary`__
