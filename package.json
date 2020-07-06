@@ -1,0 +1,80 @@
+{
+  "name": "needs-retitle",
+  "description": "",
+  "main": "/cmd/needs-retitle/main.go",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:ouzi-dev/needs-retitle.git"
+  },
+  "author": "belitre",
+  "devDependencies": {
+    "@semantic-release/commit-analyzer": "^8.0.1",
+    "@semantic-release/exec": "^5.0.0",
+    "@semantic-release/github": "^7.0.7",
+    "@semantic-release/release-notes-generator": "^9.0.1",
+    "semantic-release": "^17.1.1",
+    "env-ci": "^5.0.2",
+    "fstream": "^1.0.12",
+    "tar": "^6.0.2",
+    "npm": "^6.14.5",
+    "https-proxy-agent": "^5.0.0",
+    "kind-of": ">=6.0.3"
+  },
+  "release": {
+    "plugins": [
+      [
+        "@semantic-release/commit-analyzer",
+        {
+          "releaseRules": [
+            {
+              "type": "fix",
+              "release": "patch"
+            },
+            {
+              "type": "refactor",
+              "release": "patch"
+            },
+            {
+              "type": "feat",
+              "release": "minor"
+            },
+            {
+              "type": "major",
+              "release": "major"
+            }
+          ]
+        }
+      ],
+      "@semantic-release/release-notes-generator",
+      [
+        "@semantic-release/exec",
+        {
+          "prepareCmd": "make gcloud-docker-push VERSION=v${nextRelease.version}"
+        }
+      ],
+      [
+        "@semantic-release/github",
+        {
+          "successComment": "This ${issue.pull_request ? 'pull request' : 'issue'} is included in version ${nextRelease.version}",
+          "failComment": "The release from ${branch} had failed due to the following errors:\n- ${errors.map(err => err.message).join('\\n- ')}"
+        }
+      ]
+    ],
+    "preset": "angular",
+    "branches": [
+      "master"
+    ],
+    "tagFormat": "v${version}",
+    "ci": false
+  },
+  "version": "0.0.0-development",
+  "scripts": {
+    "semantic-release": "semantic-release"
+  },
+  "publishConfig": {
+    "access": "restricted"
+  },
+  "dependencies": {
+    "npm-check-updates": "^7.0.1"
+  }
+}

@@ -9,14 +9,11 @@ LDFLAGS := -extldflags "-static"
 
 BUILD_PATH = github.com/ouzi-dev/needs-retitle
 
-GOLANGCI_LINT_VERSION := v1.23.6
 GOLANG_VERSION := 1.14.2
 
 HAS_GOX := $(shell command -v gox;)
 HAS_GO_IMPORTS := $(shell command -v goimports;)
 HAS_GO_MOCKGEN := $(shell command -v mockgen;)
-HAS_GOLANGCI_LINT := $(shell command -v golangci-lint;)
-GOLANGCI_VERSION_CHECK := $(shell golangci-lint --version | grep -oh $(GOLANGCI_LINT_VERSION);)
 
 DOCKER_REGISTRY ?= quay.io
 DOCKER_REPO ?= $(DOCKER_REGISTRY)/ouzi
@@ -97,27 +94,6 @@ test: generate build
 	@echo "test target..."
 	@go test ./... -v -count=1
 
-.PHONY: lint
-lint: bootstrap bootstrap-lint build
-	@echo "lint target..."
-	@golangci-lint run --enable-all --disable lll,nakedret,funlen,gochecknoglobals,gomnd,wsl,errcheck ./...
-
-.PHONY: bootstrap-lint
-bootstrap-lint:
-	@echo "bootstrap lint..."
-ifndef HAS_GOLANGCI_LINT
-	@echo "golangci-lint $(GOLANGCI_LINT_VERSION) not found..."
-	@GOPROXY=direct GOSUMDB=off go get -u github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
-else
-	@echo "golangci-lint found, checking version..."
-ifeq ($(GOLANGCI_VERSION_CHECK), )
-	@echo "found different version, installing golangci-lint $(GOLANGCI_LINT_VERSION)..."
-	@GOPROXY=direct GOSUMDB=off go get -u github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
-else
-	@echo "golangci-lint version $(GOLANGCI_VERSION_CHECK) found!"
-endif
-endif
-
 .PHONY: bootstrap
 bootstrap: 
 	@echo "bootstrap target..."
@@ -162,7 +138,7 @@ docker-login:
 
 .PHONY: docker-build
 docker-build:
-	@docker build -t $(DOCKER_IMAGE):$(VERSION) -f hack/Dockerfile --build-arg GOLANG_VERSION=$(GOLANG_VERSION) --build-arg VERSION=$(VERSION) . 
+	@docker build -t $(DOCKER_IMAGE):$(VERSION) -f build/Dockerfile --build-arg GOLANG_VERSION=$(GOLANG_VERSION) --build-arg VERSION=$(VERSION) . 
 	@docker tag $(DOCKER_IMAGE):$(VERSION) ${DOCKER_REPO}/$(DOCKER_IMAGE):$(VERSION)
 
 .PHONY: docker-push
@@ -171,3 +147,21 @@ docker-push:
 
 .PHONY: docker-release
 docker-release: docker-login docker-build docker-push
+
+.PHONY: init-gcloud-cli
+init-gcloud-cli:
+ifneq ("$(wildcard $(GCLOUD_KEY_FILE))","")
+	gcloud auth activate-service-account --key-file=$(GCLOUD_KEY_FILE)
+else
+	@echo $(GCLOUD_KEY_FILE) not present
+endif
+
+.PHONY: gcloud-docker-build
+gcloud-docker-build: clean info
+	@gcloud builds submit --config build/cloudbuild-build.yaml \
+        				--substitutions=_TAG_VERSION=$(VERSION),_QUAY_REPO=${DOCKER_REPO}/$(DOCKER_IMAGE),_GOLANG_VERSION=${GOLANG_VERSION} .
+
+.PHONY: gcloud-docker-push
+gcloud-docker-push: clean info
+	@gcloud builds submit --config build/cloudbuild-push.yaml \
+    				--substitutions=_TAG_VERSION=$(VERSION),_QUAY_REPO=${DOCKER_REPO}/$(DOCKER_IMAGE),_GOLANG_VERSION=${GOLANG_VERSION} .
