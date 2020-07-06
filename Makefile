@@ -25,6 +25,8 @@ GIT_SHORT_COMMIT := $(shell git rev-parse --short HEAD)
 GIT_TAG    := $(shell git describe --tags --abbrev=0 --exact-match 2>/dev/null)
 GIT_DIRTY  = $(shell test -n "`git status --porcelain`" && echo "dirty" || echo "clean")
 
+GCLOUD_KEY_FILE := /etc/google-service-account/service-account.json
+
 TMP_VERSION := canary
 
 BINARY_VERSION := ""
