@@ -54,10 +54,6 @@ type githubClient interface {
 	GetPullRequest(org, repo string, number int) (*github.PullRequest, error)
 }
 
-type commentPruner interface {
-	PruneComments(shouldPrune func(github.IssueComment) bool)
-}
-
 type Plugin struct {
 	mut sync.Mutex
 	c   *pluginConfig
@@ -265,7 +261,6 @@ func search(ctx context.Context, log *logrus.Entry, ghc githubClient, q string) 
 	return ret, nil
 }
 
-// TODO(spxtr): Add useful information for frontend stuff such as links.
 type pullRequest struct {
 	Number githubql.Int
 	Title  githubql.String
