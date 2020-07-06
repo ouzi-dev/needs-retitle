@@ -31,7 +31,7 @@ presubmits:
       containers:
         - name: "bleh"
           imagePullPolicy: IfNotPresent
-          image: quay.io/ouzi/go-builder:1.14.2
+          image: quay.io/ouzi/toolbox:0.1.17
           command:
             - make
           args:
