@@ -16,27 +16,6 @@ presubmits:
             - make
           args:
             - test
-  - name: bleh
-    decorate: true
-    labels:
-      preset-semantic-release: "true"
-      preset-gcloud-testinfra-prow: "true"
-    always_run: true
-    skip_report: false
-    clone_uri: "git@github.com:ouzi-dev/needs-retitle.git"
-    max_concurrency: 1
-    trigger: "(?m)bleh( please)?"
-    rerun_command: "bleh"
-    spec:
-      containers:
-        - name: "bleh"
-          imagePullPolicy: IfNotPresent
-          image: quay.io/ouzi/toolbox:0.1.17
-          command:
-            - make
-          args:
-            - init-gcloud-cli
-            - gcloud-docker-build
 postsubmits:
   - name: needs-retitle-release
     labels:
