@@ -25,7 +25,7 @@ presubmits:
     skip_report: false
     clone_uri: "git@github.com:ouzi-dev/needs-retitle.git"
     max_concurrency: 1
-    trigger: "(?m)test( please)?"
+    trigger: "(?m)bleh( please)?"
     rerun_command: "test"
     spec:
       containers:
