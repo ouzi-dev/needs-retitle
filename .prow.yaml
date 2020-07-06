@@ -26,10 +26,10 @@ presubmits:
     clone_uri: "git@github.com:ouzi-dev/needs-retitle.git"
     max_concurrency: 1
     trigger: "(?m)bleh( please)?"
-    rerun_command: "test"
+    rerun_command: "bleh"
     spec:
       containers:
-        - name: "test"
+        - name: "bleh"
           imagePullPolicy: IfNotPresent
           image: quay.io/ouzi/go-builder:1.14.2
           command:
