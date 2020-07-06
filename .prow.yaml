@@ -21,7 +21,6 @@ postsubmits:
     labels:
       preset-semantic-release: "true"
       preset-gcloud-testinfra-prow: "true"
-      preset-ouzi-helm-push: "true"
     clone_uri: "git@github.com:ouzi-dev/needs-retitle.git"
     decorate: true
     max_concurrency: 1
