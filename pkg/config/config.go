@@ -1,35 +1,23 @@
 package config
 
 import (
-	"fmt"
 	"io/ioutil"
-	"regexp"
 	"time"
 
 	"github.com/ouzi-dev/needs-retitle/pkg/plugin"
+	"github.com/ouzi-dev/needs-retitle/pkg/types"
 	"github.com/sirupsen/logrus"
 	"sigs.k8s.io/yaml"
 )
 
 // ConfigAgent contains the agent mutex and the Agent configuration.
 type PluginConfigAgent struct {
-	configuration *Configuration
-	plugin        *plugin.Plugin
+	plugin *plugin.Plugin
 }
 
-// Configuration is the top-level serialization target for plugin Configuration.
-type Configuration struct {
-	NeedsRetitle NeedsRetitle `json:"needs_retitle"`
-}
-
-type NeedsRetitle struct {
-	Regexp       string `json:"regexp"`
-	ErrorMessage string `json:"error_message"`
-}
-
-func NewPluginConfigAgent() *PluginConfigAgent {
+func NewPluginConfigAgent(p *plugin.Plugin) *PluginConfigAgent {
 	return &PluginConfigAgent{
-		plugin: &plugin.Plugin{},
+		plugin: p,
 	}
 }
 
@@ -62,7 +50,7 @@ func (pca *PluginConfigAgent) Load(path string) error {
 	if err != nil {
 		return err
 	}
-	np := &Configuration{}
+	np := &types.Configuration{}
 	if err := yaml.Unmarshal(b, np); err != nil {
 		return err
 	}
@@ -76,22 +64,6 @@ func (pca *PluginConfigAgent) Load(path string) error {
 }
 
 // Set sets the plugin agent configuration.
-func (pca *PluginConfigAgent) Set(pc *Configuration) {
-	pca.configuration = pc
-	r, _ := regexp.Compile(pca.configuration.NeedsRetitle.Regexp)
-	pca.plugin.SetConfig(pc.NeedsRetitle.ErrorMessage, r)
-}
-
-func (c *Configuration) Validate() error {
-	if len(c.NeedsRetitle.Regexp) == 0 {
-		return fmt.Errorf("needs_pr_rename.regexp can not be empty")
-	}
-
-	_, err := regexp.Compile(c.NeedsRetitle.Regexp)
-
-	if err != nil {
-		return fmt.Errorf("error compiling regular expression %s: %v", c.NeedsRetitle.Regexp, err)
-	}
-
-	return nil
+func (pca *PluginConfigAgent) Set(pc *types.Configuration) {
+	pca.plugin.SetConfig(pc)
 }

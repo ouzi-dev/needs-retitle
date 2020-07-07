@@ -99,7 +99,9 @@ func main() {
 		log.WithError(err).Fatalf("Error loading plugin config from %q.", o.pluginConfig)
 	}
 
-	pca := config.NewPluginConfigAgent()
+	p := plugin.NewPlugin(pa)
+
+	pca := config.NewPluginConfigAgent(p)
 	if err := pca.Start(o.pluginConfig); err != nil {
 		log.WithError(err).Fatalf("Error loading %s config from %q.", plugin.PluginName, o.pluginConfig)
 	}
@@ -116,7 +118,7 @@ func main() {
 
 	interrupts.TickLiteral(func() {
 		start := time.Now()
-		if err := pca.GetPlugin().HandleAll(log, githubClient, pa.Config()); err != nil {
+		if err := pca.GetPlugin().HandleAll(log, githubClient); err != nil {
 			log.WithError(err).Error("Error during periodic update of all PRs.")
 		}
 		log.WithField("duration", fmt.Sprintf("%v", time.Since(start))).Info("Periodic update complete.")
