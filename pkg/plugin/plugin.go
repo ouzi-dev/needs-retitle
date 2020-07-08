@@ -25,7 +25,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ouzi-dev/needs-retitle/pkg/types"
 	githubql "github.com/shurcooL/githubv4"
 	"github.com/sirupsen/logrus"
 
@@ -58,19 +57,11 @@ type githubClient interface {
 type Plugin struct {
 	mut sync.Mutex
 	c   *pluginConfig
-	ca  *plugins.ConfigAgent
 }
 
 type pluginConfig struct {
 	errorMessage string
 	re           *regexp.Regexp
-	config       *types.Configuration
-}
-
-func NewPlugin(ca *plugins.ConfigAgent) *Plugin {
-	return &Plugin{
-		ca: ca,
-	}
 }
 
 // HelpProvider constructs the PluginHelp for this plugin that takes into account enabled repositories.
@@ -83,21 +74,18 @@ The plugin reacts to commit changes on PRs in addition to periodically scanning 
 		nil
 }
 
-func (p *Plugin) SetConfig(c *types.Configuration) {
+func (p *Plugin) SetConfig(m string, r *regexp.Regexp) {
 	p.mut.Lock()
 	defer p.mut.Unlock()
 
-	r, _ := regexp.Compile(c.NeedsRetitle.Regexp)
-
 	errorMessage := fmt.Sprintf(defaultNeedsRetitleMessage, r.String())
-	if len(c.NeedsRetitle.ErrorMessage) > 0 {
-		errorMessage = c.NeedsRetitle.ErrorMessage
+	if len(m) > 0 {
+		errorMessage = m
 	}
 
 	p.c = &pluginConfig{
 		errorMessage: errorMessage,
 		re:           r,
-		config:       c,
 	}
 }
 
@@ -143,20 +131,6 @@ func (p *Plugin) handle(log *logrus.Entry, ghc githubClient, pr *github.PullRequ
 
 	org := pr.Base.Repo.Owner.Login
 	repo := pr.Base.Repo.Name
-
-	pluginConfig := p.getConfig()
-
-	if pluginConfig.config.NeedsRetitle.RequireEnableAsNotExternal {
-		config := p.ca.Config()
-		if orgs, repos := config.EnabledReposForPlugin(PluginName); orgs != nil || repos != nil {
-			orgRepo := fmt.Sprintf("%s/%s", org, repo)
-			if !isInArray(org, orgs) && !isInArray(orgRepo, repos) {
-				log.Warnf("Repo %s not enabled for the %s plugin", orgRepo, PluginName)
-				return nil
-			}
-		}
-	}
-
 	number := pr.Number
 	title := pr.Title
 
@@ -166,36 +140,14 @@ func (p *Plugin) handle(log *logrus.Entry, ghc githubClient, pr *github.PullRequ
 	}
 	hasLabel := github.HasLabel(needsRetitleLabel, issueLabels)
 
-	return p.takeAction(log, ghc, org, repo, number, pr.User.Login, hasLabel, title, pluginConfig)
-}
-
-func isInArray(s string, a []string) bool {
-	for _, v := range a {
-		if s == v {
-			return true
-		}
-	}
-
-	return false
+	return p.takeAction(log, ghc, org, repo, number, pr.User.Login, hasLabel, title)
 }
 
 // HandleAll checks all orgs and repos that enabled this plugin for open PRs to
 // determine if the "needs-retitle" label needs to be added or removed.
-func (p *Plugin) HandleAll(log *logrus.Entry, ghc githubClient) error {
+func (p *Plugin) HandleAll(log *logrus.Entry, ghc githubClient, config *plugins.Configuration) error {
 	log.Info("Checking all PRs.")
-
-	pluginConfig := p.getConfig()
-	config := p.ca.Config()
-
-	var orgs []string
-	var repos []string
-
-	if pluginConfig.config.NeedsRetitle.RequireEnableAsNotExternal {
-		orgs, repos = config.EnabledReposForPlugin(PluginName)
-	} else {
-		orgs, repos = config.EnabledReposForExternalPlugin(PluginName)
-	}
-
+	orgs, repos := config.EnabledReposForExternalPlugin(PluginName)
 	if len(orgs) == 0 && len(repos) == 0 {
 		log.Warnf("No repos have been configured for the %s plugin", PluginName)
 		return nil
@@ -240,7 +192,6 @@ func (p *Plugin) HandleAll(log *logrus.Entry, ghc githubClient) error {
 			string(pr.Author.Login),
 			hasLabel,
 			title,
-			pluginConfig,
 		)
 		if err != nil {
 			l.WithError(err).Error("Error handling PR.")
@@ -252,7 +203,8 @@ func (p *Plugin) HandleAll(log *logrus.Entry, ghc githubClient) error {
 // takeAction adds or removes the "needs-rebase" label based on the current
 // state of the PR (hasLabel and mergeable). It also handles adding and
 // removing GitHub comments notifying the PR author that a rebase is needed.
-func (p *Plugin) takeAction(log *logrus.Entry, ghc githubClient, org, repo string, num int, author string, hasLabel bool, title string, c *pluginConfig) error {
+func (p *Plugin) takeAction(log *logrus.Entry, ghc githubClient, org, repo string, num int, author string, hasLabel bool, title string) error {
+	c := p.getConfig()
 	needsRetitleMessage := c.errorMessage
 	titleOk := c.re.MatchString(title)
 	if !titleOk && !hasLabel {

@@ -20,7 +20,6 @@ require (
 	google.golang.org/genproto v0.0.0-20191108220845-16a3f7862a1a // indirect
 	gopkg.in/yaml.v2 v2.3.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776 // indirect
-	gotest.tools v2.2.0+incompatible
 	honnef.co/go/tools v0.0.1-2020.1.4 // indirect
 	k8s.io/test-infra v0.0.0-20200702033203-1e71b3526aef
 	sigs.k8s.io/yaml v1.2.0
