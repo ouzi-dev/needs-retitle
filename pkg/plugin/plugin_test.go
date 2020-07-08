@@ -142,7 +142,6 @@ func (f *fghc) compareExpected(t *testing.T, org, repo string, num int, expected
 }
 
 func TestHandleIssueCommentEvent(t *testing.T) {
-
 	pr := func(s string) *github.PullRequest {
 		pr := github.PullRequest{
 			Base: github.PullRequestBranch{
@@ -161,20 +160,9 @@ func TestHandleIssueCommentEvent(t *testing.T) {
 	sleep = func(time.Duration) { return }
 	defer func() { sleep = oldSleep }()
 
-	r, err := regexp.Compile("^(fix:|feat:|major:).*$")
-	if err != nil {
-		t.Fatalf("error while compiling regular expression: %v", err)
-	}
-
-	testSubject := &Plugin{
-		c: &pluginConfig{
-			errorMessage: fmt.Sprintf(defaultNeedsRetitleMessage, r.String()),
-			re:           r,
-		},
-	}
-
 	testCases := []struct {
 		name string
+		re   string
 		pr   *github.PullRequest
 
 		merged bool
@@ -187,19 +175,23 @@ func TestHandleIssueCommentEvent(t *testing.T) {
 	}{
 		{
 			name: "No pull request, ignoring",
+			re:   "^(fix:|feat:|major:).*$",
 		},
 		{
 			name:   "correct title no-op",
+			re:     "^(fix:|feat:|major:).*$",
 			pr:     pr("fix: this is a valid title"),
 			labels: []string{labels.LGTM, labels.NeedsSig},
 		},
 		{
 			name:   "wrong title no-op",
+			re:     "^(fix:|feat:|major:).*$",
 			pr:     pr("this title is wrong..."),
 			labels: []string{labels.LGTM, labels.NeedsSig, needsRetitleLabel},
 		},
 		{
 			name:   "wrong title adds label",
+			re:     "^(fix:|feat:|major:).*$",
 			pr:     pr("this title is wrong..."),
 			labels: []string{labels.LGTM, labels.NeedsSig},
 
@@ -207,7 +199,13 @@ func TestHandleIssueCommentEvent(t *testing.T) {
 			expectComment: true,
 		},
 		{
+			name:   "wrong title no config ignores it",
+			pr:     pr("this title is wrong..."),
+			labels: []string{labels.LGTM, labels.NeedsSig},
+		},
+		{
 			name:   "valid title removes label",
+			re:     "^(fix:|feat:|major:).*$",
 			pr:     pr("feat: this is valid title"),
 			labels: []string{labels.LGTM, labels.NeedsSig, needsRetitleLabel},
 
@@ -216,6 +214,7 @@ func TestHandleIssueCommentEvent(t *testing.T) {
 		},
 		{
 			name:   "merged pr is ignored",
+			re:     "^(fix:|feat:|major:).*$",
 			pr:     pr("bleh"),
 			merged: true,
 		},
@@ -223,6 +222,14 @@ func TestHandleIssueCommentEvent(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			testSubject := &Plugin{}
+			if len(tc.re) > 0 {
+				r, _ := regexp.Compile(tc.re)
+				testSubject.c = &pluginConfig{
+					errorMessage: fmt.Sprintf(defaultNeedsRetitleMessage, "some regexp"),
+					re:           r,
+				}
+			}
 			fake := newFakeClient(nil, tc.labels, tc.pr)
 			ice := &github.IssueCommentEvent{}
 			if tc.pr != nil {
@@ -242,20 +249,9 @@ func TestHandlePullRequestEvent(t *testing.T) {
 	sleep = func(time.Duration) { return }
 	defer func() { sleep = oldSleep }()
 
-	r, err := regexp.Compile("^(fix:|feat:|major:).*$")
-	if err != nil {
-		t.Fatalf("error while compiling regular expression: %v", err)
-	}
-
-	testSubject := &Plugin{
-		c: &pluginConfig{
-			errorMessage: fmt.Sprintf(defaultNeedsRetitleMessage, r.String()),
-			re:           r,
-		},
-	}
-
 	testCases := []struct {
 		name string
+		re   string
 
 		title  string
 		merged bool
@@ -268,16 +264,19 @@ func TestHandlePullRequestEvent(t *testing.T) {
 	}{
 		{
 			name:   "correct title no-op",
+			re:     "^(fix:|feat:|major:).*$",
 			title:  "fix: this is a valid title",
 			labels: []string{labels.LGTM, labels.NeedsSig},
 		},
 		{
 			name:   "wrong title no-op",
+			re:     "^(fix:|feat:|major:).*$",
 			title:  "fixing: wrong title",
 			labels: []string{labels.LGTM, labels.NeedsSig, needsRetitleLabel},
 		},
 		{
 			name:   "wrong title adds label",
+			re:     "^(fix:|feat:|major:).*$",
 			title:  "fixing: wrong title",
 			labels: []string{labels.LGTM, labels.NeedsSig},
 
@@ -285,7 +284,13 @@ func TestHandlePullRequestEvent(t *testing.T) {
 			expectComment: true,
 		},
 		{
+			name:   "wrong title, no config ignores it",
+			title:  "fixing: wrong title",
+			labels: []string{labels.LGTM, labels.NeedsSig},
+		},
+		{
 			name:   "correct title removes label",
+			re:     "^(fix:|feat:|major:).*$",
 			title:  "major: this is a valid title",
 			labels: []string{labels.LGTM, labels.NeedsSig, needsRetitleLabel},
 
@@ -294,11 +299,20 @@ func TestHandlePullRequestEvent(t *testing.T) {
 		},
 		{
 			name:   "merged pr is ignored",
+			re:     "^(fix:|feat:|major:).*$",
 			merged: true,
 		},
 	}
 
 	for _, tc := range testCases {
+		testSubject := &Plugin{}
+		if len(tc.re) > 0 {
+			r, _ := regexp.Compile(tc.re)
+			testSubject.c = &pluginConfig{
+				errorMessage: fmt.Sprintf(defaultNeedsRetitleMessage, "some regexp"),
+				re:           r,
+			}
+		}
 		fake := newFakeClient(nil, tc.labels, nil)
 		pre := &github.PullRequestEvent{
 			Action: github.PullRequestActionSynchronize,

@@ -89,7 +89,7 @@ func (p *Plugin) SetConfig(m string, r *regexp.Regexp) {
 	}
 }
 
-func (p *Plugin) getConfig() *pluginConfig {
+func (p *Plugin) GetConfig() *pluginConfig {
 	p.mut.Lock()
 	defer p.mut.Unlock()
 	return p.c
@@ -129,6 +129,13 @@ func (p *Plugin) handle(log *logrus.Entry, ghc githubClient, pr *github.PullRequ
 		return nil
 	}
 
+	c := p.GetConfig()
+
+	if c == nil {
+		log.Warnf("No regular expression provided, please check your settings")
+		return nil
+	}
+
 	org := pr.Base.Repo.Owner.Login
 	repo := pr.Base.Repo.Name
 	number := pr.Number
@@ -140,13 +147,21 @@ func (p *Plugin) handle(log *logrus.Entry, ghc githubClient, pr *github.PullRequ
 	}
 	hasLabel := github.HasLabel(needsRetitleLabel, issueLabels)
 
-	return p.takeAction(log, ghc, org, repo, number, pr.User.Login, hasLabel, title)
+	return p.takeAction(log, ghc, org, repo, number, pr.User.Login, hasLabel, title, c)
 }
 
 // HandleAll checks all orgs and repos that enabled this plugin for open PRs to
 // determine if the "needs-retitle" label needs to be added or removed.
 func (p *Plugin) HandleAll(log *logrus.Entry, ghc githubClient, config *plugins.Configuration) error {
 	log.Info("Checking all PRs.")
+
+	c := p.GetConfig()
+
+	if c == nil {
+		log.Warnf("No regular expression provided, please check your settings")
+		return nil
+	}
+
 	orgs, repos := config.EnabledReposForExternalPlugin(PluginName)
 	if len(orgs) == 0 && len(repos) == 0 {
 		log.Warnf("No repos have been configured for the %s plugin", PluginName)
@@ -192,6 +207,7 @@ func (p *Plugin) HandleAll(log *logrus.Entry, ghc githubClient, config *plugins.
 			string(pr.Author.Login),
 			hasLabel,
 			title,
+			c,
 		)
 		if err != nil {
 			l.WithError(err).Error("Error handling PR.")
@@ -203,8 +219,7 @@ func (p *Plugin) HandleAll(log *logrus.Entry, ghc githubClient, config *plugins.
 // takeAction adds or removes the "needs-rebase" label based on the current
 // state of the PR (hasLabel and mergeable). It also handles adding and
 // removing GitHub comments notifying the PR author that a rebase is needed.
-func (p *Plugin) takeAction(log *logrus.Entry, ghc githubClient, org, repo string, num int, author string, hasLabel bool, title string) error {
-	c := p.getConfig()
+func (p *Plugin) takeAction(log *logrus.Entry, ghc githubClient, org, repo string, num int, author string, hasLabel bool, title string, c *pluginConfig) error {
 	needsRetitleMessage := c.errorMessage
 	titleOk := c.re.MatchString(title)
 	if !titleOk && !hasLabel {

@@ -78,13 +78,17 @@ func (pca *PluginConfigAgent) Load(path string) error {
 // Set sets the plugin agent configuration.
 func (pca *PluginConfigAgent) Set(pc *Configuration) {
 	pca.configuration = pc
-	r, _ := regexp.Compile(pca.configuration.NeedsRetitle.Regexp)
-	pca.plugin.SetConfig(pc.NeedsRetitle.ErrorMessage, r)
+
+	if len(pc.NeedsRetitle.Regexp) > 0 {
+		r, _ := regexp.Compile(pca.configuration.NeedsRetitle.Regexp)
+		pca.plugin.SetConfig(pc.NeedsRetitle.ErrorMessage, r)
+	}
 }
 
 func (c *Configuration) Validate() error {
 	if len(c.NeedsRetitle.Regexp) == 0 {
-		return fmt.Errorf("needs_pr_rename.regexp can not be empty")
+		logrus.Warning("empty regular expression provided, the plugin won't do anything")
+		return nil
 	}
 
 	_, err := regexp.Compile(c.NeedsRetitle.Regexp)
