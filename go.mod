@@ -11,7 +11,7 @@ require (
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/shurcooL/githubv4 v0.0.0-20200627185320-e003124d66e4
 	github.com/sirupsen/logrus v1.6.0
-	github.com/stretchr/testify v1.6.1 // indirect
+	github.com/stretchr/testify v1.6.1
 	golang.org/x/exp v0.0.0-20191030013958-a1ab85dbe136 // indirect
 	golang.org/x/mod v0.3.0 // indirect
 	golang.org/x/sys v0.0.0-20200625212154-ddb9806d33ae // indirect

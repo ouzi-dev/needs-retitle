@@ -1,0 +1,3 @@
+needs_retitle:
+  regexp: "^(fix:|feat:|major:).*$"
+  error_message: "blah blah"
