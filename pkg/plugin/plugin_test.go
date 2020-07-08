@@ -26,10 +26,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ouzi-dev/needs-retitle/pkg/types"
 	githubql "github.com/shurcooL/githubv4"
 	"github.com/sirupsen/logrus"
-	"gotest.tools/assert"
 
 	"k8s.io/test-infra/prow/github"
 	"k8s.io/test-infra/prow/labels"
@@ -51,8 +49,6 @@ type fghc struct {
 	// The following are maps are keyed using 'testKey'
 	commentCreated, commentDeleted       map[string]bool
 	IssueLabelsAdded, IssueLabelsRemoved map[string][]string
-
-	query string
 }
 
 func newFakeClient(prs []pullRequest, initialLabels []string, pr *github.PullRequest) *fghc {
@@ -105,19 +101,11 @@ func (f *fghc) DeleteStaleComments(org, repo string, number int, comments []gith
 	return nil
 }
 
-func (f *fghc) Query(_ context.Context, q interface{}, vars map[string]interface{}) error {
+func (f *fghc) Query(_ context.Context, q interface{}, _ map[string]interface{}) error {
 	query, ok := q.(*searchQuery)
 	if !ok {
 		return errors.New("invalid query format")
 	}
-
-	queryString, ok := vars["query"]
-	if !ok {
-		return errors.New("invalid query string")
-	}
-
-	f.query = fmt.Sprintf("%v", queryString)
-
 	query.Search.Nodes = f.allPRs
 	return nil
 }
@@ -154,6 +142,7 @@ func (f *fghc) compareExpected(t *testing.T, org, repo string, num int, expected
 }
 
 func TestHandleIssueCommentEvent(t *testing.T) {
+
 	pr := func(s string) *github.PullRequest {
 		pr := github.PullRequest{
 			Base: github.PullRequestBranch{
@@ -181,12 +170,6 @@ func TestHandleIssueCommentEvent(t *testing.T) {
 		c: &pluginConfig{
 			errorMessage: fmt.Sprintf(defaultNeedsRetitleMessage, r.String()),
 			re:           r,
-			config: &types.Configuration{
-				NeedsRetitle: types.NeedsRetitle{
-					Regexp:                     "^(fix:|feat:|major:).*$",
-					RequireEnableAsNotExternal: false,
-				},
-			},
 		},
 	}
 
@@ -268,12 +251,6 @@ func TestHandlePullRequestEvent(t *testing.T) {
 		c: &pluginConfig{
 			errorMessage: fmt.Sprintf(defaultNeedsRetitleMessage, r.String()),
 			re:           r,
-			config: &types.Configuration{
-				NeedsRetitle: types.NeedsRetitle{
-					Regexp:                     "^(fix:|feat:|major:).*$",
-					RequireEnableAsNotExternal: false,
-				},
-			},
 		},
 	}
 
@@ -351,38 +328,11 @@ func TestHandleAll(t *testing.T) {
 		t.Fatalf("error while compiling regular expression: %v", err)
 	}
 
-	config := &plugins.Configuration{
-		Plugins: map[string][]string{
-			"org/repo": {labels.LGTM, PluginName},
-			"org/bleh": {labels.LGTM},
-			"org/blah": {labels.LGTM, PluginName},
-			"blih":     {labels.LGTM, PluginName},
-		},
-
-		ExternalPlugins: map[string][]plugins.ExternalPlugin{
-			"org":       {{Name: PluginName}},
-			"bleh/blah": {{Name: PluginName}},
-		},
-	}
-
-	expectedQuery := "archived:false is:pr is:open org:\"org\" repo:\"bleh/blah\""
-
-	ca := &plugins.ConfigAgent{}
-
-	ca.Set(config)
-
 	testSubject := &Plugin{
 		c: &pluginConfig{
 			errorMessage: fmt.Sprintf(defaultNeedsRetitleMessage, r.String()),
 			re:           r,
-			config: &types.Configuration{
-				NeedsRetitle: types.NeedsRetitle{
-					Regexp:                     "^(fix:|feat:|major:).*$",
-					RequireEnableAsNotExternal: false,
-				},
-			},
 		},
-		ca: ca,
 	}
 
 	testPRs := []struct {
@@ -435,290 +385,15 @@ func TestHandleAll(t *testing.T) {
 		prs = append(prs, pr)
 	}
 	fake := newFakeClient(prs, nil, nil)
-
-	if err := testSubject.HandleAll(logrus.WithField("plugin", PluginName), fake); err != nil {
-		t.Fatalf("Unexpected error handling all prs: %v.", err)
-	}
-
-	assert.Equal(t, expectedQuery, fake.query)
-
-	for i, pr := range testPRs {
-		fake.compareExpected(t, "", "", i, pr.expectedAdded, pr.expectedRemoved, pr.expectComment, pr.expectDeletion)
-	}
-}
-
-func TestHandlePullRequestEventOnRequireEnableAsNotExternal(t *testing.T) {
-	oldSleep := sleep
-	sleep = func(time.Duration) { return }
-	defer func() { sleep = oldSleep }()
-
-	r, err := regexp.Compile("^(fix:|feat:|major:).*$")
-	if err != nil {
-		t.Fatalf("error while compiling regular expression: %v", err)
-	}
-
-	ca := &plugins.ConfigAgent{}
-
-	testSubject := &Plugin{
-		c: &pluginConfig{
-			errorMessage: fmt.Sprintf(defaultNeedsRetitleMessage, r.String()),
-			re:           r,
-			config: &types.Configuration{
-				NeedsRetitle: types.NeedsRetitle{
-					Regexp:                     "^(fix:|feat:|major:).*$",
-					RequireEnableAsNotExternal: true,
-				},
-			},
-		},
-		ca: ca,
-	}
-
-	testCases := []struct {
-		name string
-
-		title  string
-		merged bool
-		labels []string
-
-		expectedAdded   []string
-		expectedRemoved []string
-		expectComment   bool
-		expectDeletion  bool
-
-		pc *plugins.Configuration
-	}{
-		{
-			name:   "correct title and plugin enabled for repo no-op",
-			title:  "fix: this is a valid title",
-			labels: []string{labels.LGTM, labels.NeedsSig},
-			pc: &plugins.Configuration{
-				Plugins: map[string][]string{"org/repo": {labels.LGTM, PluginName}},
-
-				ExternalPlugins: map[string][]plugins.ExternalPlugin{"org": {{Name: PluginName}}},
-			},
-		},
-		{
-			name:   "wrong title and plugin enabled for repo no-op",
-			title:  "fixing: wrong title",
-			labels: []string{labels.LGTM, labels.NeedsSig, needsRetitleLabel},
-			pc: &plugins.Configuration{
-				Plugins: map[string][]string{"org/repo": {labels.LGTM, PluginName}},
-
-				ExternalPlugins: map[string][]plugins.ExternalPlugin{"org": {{Name: PluginName}}},
-			},
-		},
-		{
-			name:   "wrong title and plugin enabled for repo adds label",
-			title:  "fixing: wrong title",
-			labels: []string{labels.LGTM, labels.NeedsSig},
-
-			expectedAdded: []string{needsRetitleLabel},
-			expectComment: true,
-			pc: &plugins.Configuration{
-				Plugins: map[string][]string{"org/repo": {labels.LGTM, PluginName}},
-
-				ExternalPlugins: map[string][]plugins.ExternalPlugin{"org": {{Name: PluginName}}},
-			},
-		},
-		{
-			name:   "correct title and plugin enabled for repo removes label",
-			title:  "major: this is a valid title",
-			labels: []string{labels.LGTM, labels.NeedsSig, needsRetitleLabel},
-
-			expectedRemoved: []string{needsRetitleLabel},
-			expectDeletion:  true,
-			pc: &plugins.Configuration{
-				Plugins: map[string][]string{"org/repo": {labels.LGTM, PluginName}},
-
-				ExternalPlugins: map[string][]plugins.ExternalPlugin{"org": {{Name: PluginName}}},
-			},
-		},
-
-		{
-			name:   "correct title and plugin enabled for org no-op",
-			title:  "fix: this is a valid title",
-			labels: []string{labels.LGTM, labels.NeedsSig},
-			pc: &plugins.Configuration{
-				Plugins: map[string][]string{"org": {labels.LGTM, PluginName}},
-
-				ExternalPlugins: map[string][]plugins.ExternalPlugin{"org": {{Name: PluginName}}},
-			},
-		},
-		{
-			name:   "wrong title and plugin enabled for org no-op",
-			title:  "fixing: wrong title",
-			labels: []string{labels.LGTM, labels.NeedsSig, needsRetitleLabel},
-			pc: &plugins.Configuration{
-				Plugins: map[string][]string{"org": {labels.LGTM, PluginName}},
-
-				ExternalPlugins: map[string][]plugins.ExternalPlugin{"org": {{Name: PluginName}}},
-			},
-		},
-		{
-			name:   "wrong title and plugin enabled for org adds label",
-			title:  "fixing: wrong title",
-			labels: []string{labels.LGTM, labels.NeedsSig},
-
-			expectedAdded: []string{needsRetitleLabel},
-			expectComment: true,
-			pc: &plugins.Configuration{
-				Plugins: map[string][]string{"org": {labels.LGTM, PluginName}},
-
-				ExternalPlugins: map[string][]plugins.ExternalPlugin{"org": {{Name: PluginName}}},
-			},
-		},
-		{
-			name:   "correct title and plugin enabled for org removes label",
-			title:  "major: this is a valid title",
-			labels: []string{labels.LGTM, labels.NeedsSig, needsRetitleLabel},
-
-			expectedRemoved: []string{needsRetitleLabel},
-			expectDeletion:  true,
-			pc: &plugins.Configuration{
-				Plugins: map[string][]string{"org": {labels.LGTM, PluginName}},
-
-				ExternalPlugins: map[string][]plugins.ExternalPlugin{"org": {{Name: PluginName}}},
-			},
-		},
-		{
-			name:   "wrong title and plugin not enabled for org or repo doesn't add label",
-			title:  "fixing: wrong title",
-			labels: []string{labels.LGTM, labels.NeedsSig},
-			pc: &plugins.Configuration{
-				Plugins: map[string][]string{"bleh": {labels.LGTM, PluginName}},
-
-				ExternalPlugins: map[string][]plugins.ExternalPlugin{"org": {{Name: PluginName}}},
-			},
-		},
-		{
-			name:   "merged pr is ignored",
-			merged: true,
-		},
-	}
-
-	for _, tc := range testCases {
-		fake := newFakeClient(nil, tc.labels, nil)
-		ca.Set(tc.pc)
-		pre := &github.PullRequestEvent{
-			Action: github.PullRequestActionSynchronize,
-			PullRequest: github.PullRequest{
-				Base: github.PullRequestBranch{
-					Repo: github.Repo{
-						Name:  "repo",
-						Owner: github.User{Login: "org"},
-					},
-				},
-				Title:  tc.title,
-				Merged: tc.merged,
-				Number: 5,
-			},
-		}
-		t.Logf("Running test scenario: %q", tc.name)
-		if err := testSubject.HandlePullRequestEvent(logrus.WithField("plugin", PluginName), fake, pre); err != nil {
-			t.Fatalf("Unexpected error handling event: %v.", err)
-		}
-		fake.compareExpected(t, "org", "repo", 5, tc.expectedAdded, tc.expectedRemoved, tc.expectComment, tc.expectDeletion)
-	}
-}
-
-func TestHandleAllOnRequireEnableAsNotExternal(t *testing.T) {
-	r, err := regexp.Compile("^(fix:|feat:|major:).*$")
-	if err != nil {
-		t.Fatalf("error while compiling regular expression: %v", err)
-	}
-
 	config := &plugins.Configuration{
-		Plugins: map[string][]string{
-			"org/repo": {labels.LGTM, PluginName},
-			"org/bleh": {labels.LGTM},
-			"org/blah": {labels.LGTM, PluginName},
-			"blih":     {labels.LGTM, PluginName},
-		},
+		Plugins: map[string][]string{"/": {labels.LGTM, PluginName}},
 
-		ExternalPlugins: map[string][]plugins.ExternalPlugin{"org": {{Name: PluginName}}},
+		ExternalPlugins: map[string][]plugins.ExternalPlugin{"/": {{Name: PluginName}}},
 	}
 
-	expectedQuery := "archived:false is:pr is:open org:\"blih\" repo:\"org/repo\" repo:\"org/blah\""
-
-	ca := &plugins.ConfigAgent{}
-
-	ca.Set(config)
-
-	testSubject := &Plugin{
-		c: &pluginConfig{
-			errorMessage: fmt.Sprintf(defaultNeedsRetitleMessage, r.String()),
-			re:           r,
-			config: &types.Configuration{
-				NeedsRetitle: types.NeedsRetitle{
-					Regexp:                     "^(fix:|feat:|major:).*$",
-					RequireEnableAsNotExternal: true,
-				},
-			},
-		},
-		ca: ca,
-	}
-
-	testPRs := []struct {
-		labels []string
-		title  string
-		org    string
-		repo   string
-
-		expectedAdded, expectedRemoved []string
-		expectComment, expectDeletion  bool
-	}{
-		{
-			title:  "fix: this is a valid title",
-			labels: []string{labels.LGTM, labels.NeedsSig},
-		},
-		{
-			title:  "blah blah blah",
-			labels: []string{labels.LGTM, labels.NeedsSig, needsRetitleLabel},
-		},
-		{
-			title:  "bleh bleh bleh",
-			labels: []string{labels.LGTM, labels.NeedsSig},
-
-			expectedAdded: []string{needsRetitleLabel},
-			expectComment: true,
-		},
-		{
-			title:  "feat: this is a valid title",
-			labels: []string{labels.LGTM, labels.NeedsSig, needsRetitleLabel},
-
-			expectedRemoved: []string{needsRetitleLabel},
-			expectDeletion:  true,
-		},
-	}
-
-	prs := []pullRequest{}
-	for i, testPR := range testPRs {
-		pr := pullRequest{
-			Number: githubql.Int(i),
-		}
-
-		pr.Title = githubql.String(testPR.title)
-		pr.Repository.Name = githubql.String(testPR.repo)
-		pr.Repository.Owner.Login = githubql.String(testPR.org)
-
-		for _, label := range testPR.labels {
-			s := struct {
-				Name githubql.String
-			}{
-				Name: githubql.String(label),
-			}
-			pr.Labels.Nodes = append(pr.Labels.Nodes, s)
-		}
-		prs = append(prs, pr)
-	}
-	fake := newFakeClient(prs, nil, nil)
-
-	if err := testSubject.HandleAll(logrus.WithField("plugin", PluginName), fake); err != nil {
+	if err := testSubject.HandleAll(logrus.WithField("plugin", PluginName), fake, config); err != nil {
 		t.Fatalf("Unexpected error handling all prs: %v.", err)
 	}
-
-	assert.Equal(t, expectedQuery, fake.query)
-
 	for i, pr := range testPRs {
 		fake.compareExpected(t, "", "", i, pr.expectedAdded, pr.expectedRemoved, pr.expectComment, pr.expectDeletion)
 	}
