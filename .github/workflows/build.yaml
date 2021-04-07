@@ -16,3 +16,6 @@ jobs:
 
       - name: build and test
         run: make build test
+
+      - name: sleep test
+        run: sleep 4m
