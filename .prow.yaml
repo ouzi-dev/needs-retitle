@@ -11,7 +11,7 @@ presubmits:
       containers:
         - name: "test"
           imagePullPolicy: IfNotPresent
-          image: quay.io/ouzi/go-builder:1.14.2
+          image: quay.io/ouzi/go-builder:1.15.11
           command:
             - make
           args:
@@ -30,7 +30,7 @@ postsubmits:
       containers:
         - name: "release"
           imagePullPolicy: Always
-          image: quay.io/ouzi/toolbox:0.1.17
+          image: quay.io/ouzi/toolbox:0.1.21
           command:
             - make
           args:
