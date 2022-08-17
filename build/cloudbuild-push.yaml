@@ -1,14 +1,5 @@
 steps:
   - name: "gcr.io/cloud-builders/docker"
-    id: "login"
-    entrypoint: "bash"
-    args:
-      [
-        "-c",
-        "docker login quay.io --username=$$QUAY_USERNAME --password=$$QUAY_TOKEN",
-      ]
-    secretEnv: ["QUAY_USERNAME", "QUAY_TOKEN"]
-  - name: "gcr.io/cloud-builders/docker"
     id: "build"
     args:
       [
@@ -25,7 +16,6 @@ steps:
         "VERSION=${_TAG_VERSION}",
         ".",
       ]
-    waitFor: ["login"]
   - name: 'gcr.io/cloud-builders/docker'
     entrypoint: 'bash'
     args: ['-c', 'docker login quay.io --username=$$QUAY_USERNAME --password=$$QUAY_TOKEN && docker push ${_QUAY_REPO}:${_TAG_VERSION} && docker push ${_QUAY_REPO}:latest']
