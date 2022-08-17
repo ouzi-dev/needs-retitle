@@ -143,7 +143,7 @@ docker-build:
 	@docker build -t $(DOCKER_IMAGE):$(VERSION) -f build/Dockerfile --build-arg GOLANG_VERSION=$(GOLANG_VERSION) --build-arg VERSION=$(VERSION) . 
 	@docker tag $(DOCKER_IMAGE):$(VERSION) ${DOCKER_REPO}/$(DOCKER_IMAGE):$(VERSION)
 
-.PHONY: docker-push${GOLANG_VERSION}
+.PHONY: docker-push
 docker-push: 
 	@docker push ${DOCKER_REPO}/$(DOCKER_IMAGE):$(VERSION)
 
