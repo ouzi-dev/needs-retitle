@@ -46,11 +46,11 @@ var sleep = time.Sleep
 type githubClient interface {
 	GetIssueLabels(org, repo string, number int) ([]github.Label, error)
 	CreateComment(org, repo string, number int, comment string) error
-	BotName() (string, error)
+	BotUser() (*github.UserData, error)
 	AddLabel(org, repo string, number int, label string) error
 	RemoveLabel(org, repo string, number int, label string) error
 	DeleteStaleComments(org, repo string, number int, comments []github.IssueComment, isStale func(github.IssueComment) bool) error
-	Query(context.Context, interface{}, map[string]interface{}) error
+	QueryWithGitHubAppsSupport(ctx context.Context, q interface{}, vars map[string]interface{}, org string) error
 	GetPullRequest(org, repo string, number int) (*github.PullRequest, error)
 }
 
@@ -233,7 +233,8 @@ func (p *Plugin) takeAction(log *logrus.Entry, ghc githubClient, org, repo strin
 		if err := ghc.RemoveLabel(org, repo, num, needsRetitleLabel); err != nil {
 			log.WithError(err).Errorf("Failed to remove %q label.", needsRetitleLabel)
 		}
-		botName, err := ghc.BotName()
+		botUser, err := ghc.BotUser()
+		botName := botUser.Name
 		if err != nil {
 			return err
 		}
@@ -259,7 +260,7 @@ func search(ctx context.Context, log *logrus.Entry, ghc githubClient, q string) 
 	var remaining int
 	for {
 		sq := searchQuery{}
-		if err := ghc.Query(ctx, &sq, vars); err != nil {
+		if err := ghc.QueryWithGitHubAppsSupport(ctx, &sq, vars, ""); err != nil {
 			return nil, err
 		}
 		totalCost += int(sq.RateLimit.Cost)

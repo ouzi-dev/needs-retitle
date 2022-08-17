@@ -1,4 +1,4 @@
-ARG GOLANG_VERSION=1.14.2
+ARG GOLANG_VERSION=1.18.5
 
 FROM quay.io/ouzi/go-builder:${GOLANG_VERSION} as builder
 
@@ -10,7 +10,7 @@ WORKDIR /go/github.com/ouzi-dev/needs-retitle
 
 RUN VERSION=${VERSION} make build test
 
-FROM alpine:3.12
+FROM alpine:3.16
 
 RUN apk --update --no-cache add ca-certificates
 

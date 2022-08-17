@@ -34,15 +34,15 @@ import (
 	"k8s.io/test-infra/pkg/flagutil"
 	"k8s.io/test-infra/prow/config/secret"
 	prowflagutil "k8s.io/test-infra/prow/flagutil"
+	pluginsflagutil "k8s.io/test-infra/prow/flagutil/plugins"
 
 	"k8s.io/test-infra/prow/pluginhelp/externalplugins"
-	"k8s.io/test-infra/prow/plugins"
 )
 
 type options struct {
 	port int
 
-	pluginConfig string
+	pluginConfig pluginsflagutil.PluginOptions
 	dryRun       bool
 	github       prowflagutil.GitHubOptions
 
@@ -65,12 +65,13 @@ func gatherOptions() options {
 	o := options{}
 	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	fs.IntVar(&o.port, "port", 8888, "Port to listen on.")
-	fs.StringVar(&o.pluginConfig, "plugin-config", "/etc/plugins/plugins.yaml", "Path to plugin config file.")
 	fs.BoolVar(&o.dryRun, "dry-run", true, "Dry run for testing. Uses API tokens but does not mutate.")
 	fs.DurationVar(&o.updatePeriod, "update-period", time.Hour*24, "Period duration for periodic scans of all PRs.")
 	fs.StringVar(&o.webhookSecretFile, "hmac-secret-file", "/etc/webhook/hmac", "Path to the file containing the GitHub HMAC secret.")
 
-	for _, group := range []flagutil.OptionGroup{&o.github} {
+	o.pluginConfig.PluginConfigPathDefault = "/etc/plugins/plugins.yaml"
+
+	for _, group := range []flagutil.OptionGroup{&o.github, &o.pluginConfig} {
 		group.AddFlags(fs)
 	}
 	fs.Parse(os.Args[1:])
@@ -89,28 +90,27 @@ func main() {
 
 	log.Infof("Starting plugin %s %s", plugin.PluginName, version.GetVersion())
 
-	secretAgent := &secret.Agent{}
-	if err := secretAgent.Start([]string{o.github.TokenPath, o.webhookSecretFile}); err != nil {
+	if err := secret.Add(o.github.TokenPath, o.webhookSecretFile); err != nil {
 		logrus.WithError(err).Fatal("Error starting secrets agent.")
 	}
 
-	pa := &plugins.ConfigAgent{}
-	if err := pa.Start(o.pluginConfig, false); err != nil {
-		log.WithError(err).Fatalf("Error loading plugin config from %q.", o.pluginConfig)
+	pa, err := o.pluginConfig.PluginAgent()
+	if err != nil {
+		log.WithError(err).Fatal("Error loading plugin config")
 	}
 
 	pca := config.NewPluginConfigAgent()
-	if err := pca.Start(o.pluginConfig); err != nil {
-		log.WithError(err).Fatalf("Error loading %s config from %q.", plugin.PluginName, o.pluginConfig)
+	if err := pca.Start(o.pluginConfig.PluginConfigPath); err != nil {
+		log.WithError(err).Fatalf("Error loading %s config from %q.", plugin.PluginName, o.pluginConfig.PluginConfigPath)
 	}
 
-	githubClient, err := o.github.GitHubClient(secretAgent, o.dryRun)
+	githubClient, err := o.github.GitHubClient(o.dryRun)
 	if err != nil {
 		logrus.WithError(err).Fatal("Error getting GitHub client.")
 	}
 	githubClient.Throttle(360, 360)
 
-	s := server.NewServer(secretAgent.GetTokenGenerator(o.webhookSecretFile), githubClient, log, pca.GetPlugin())
+	s := server.NewServer(secret.GetTokenGenerator(o.webhookSecretFile), githubClient, log, pca.GetPlugin())
 
 	defer interrupts.WaitForGracefulShutdown()
 
