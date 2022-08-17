@@ -101,7 +101,7 @@ func main() {
 
 	pca := config.NewPluginConfigAgent()
 	if err := pca.Start(o.pluginConfig.PluginConfigPath); err != nil {
-		log.WithError(err).Fatalf("Error loading %s config from %q.", plugin.PluginName, o.pluginConfig)
+		log.WithError(err).Fatalf("Error loading %s config from %q.", plugin.PluginName, o.pluginConfig.PluginConfigPath)
 	}
 
 	githubClient, err := o.github.GitHubClient(o.dryRun)
