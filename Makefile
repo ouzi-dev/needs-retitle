@@ -9,7 +9,7 @@ LDFLAGS := -extldflags "-static"
 
 BUILD_PATH = github.com/ouzi-dev/needs-retitle
 
-GOLANG_VERSION := 1.14.2
+GOLANG_VERSION := 1.18.5
 
 HAS_GOX := $(shell command -v gox;)
 HAS_GO_IMPORTS := $(shell command -v goimports;)
@@ -143,7 +143,7 @@ docker-build:
 	@docker build -t $(DOCKER_IMAGE):$(VERSION) -f build/Dockerfile --build-arg GOLANG_VERSION=$(GOLANG_VERSION) --build-arg VERSION=$(VERSION) . 
 	@docker tag $(DOCKER_IMAGE):$(VERSION) ${DOCKER_REPO}/$(DOCKER_IMAGE):$(VERSION)
 
-.PHONY: docker-push
+.PHONY: docker-push${GOLANG_VERSION}
 docker-push: 
 	@docker push ${DOCKER_REPO}/$(DOCKER_IMAGE):$(VERSION)
 
