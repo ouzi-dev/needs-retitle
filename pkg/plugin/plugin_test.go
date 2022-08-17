@@ -80,8 +80,8 @@ func (f *fghc) CreateComment(org, repo string, number int, comment string) error
 	return nil
 }
 
-func (f *fghc) BotName() (string, error) {
-	return "k8s-ci-robot", nil
+func (c *fghc) BotUser() (*github.UserData, error) {
+	return &github.UserData{Login: "me", Name: "k8s-ci-robot"}, nil
 }
 
 func (f *fghc) AddLabel(org, repo string, number int, label string) error {
@@ -101,7 +101,7 @@ func (f *fghc) DeleteStaleComments(org, repo string, number int, comments []gith
 	return nil
 }
 
-func (f *fghc) Query(_ context.Context, q interface{}, _ map[string]interface{}) error {
+func (f *fghc) QueryWithGitHubAppsSupport(_ context.Context, q interface{}, _ map[string]interface{}, _ string) error {
 	query, ok := q.(*searchQuery)
 	if !ok {
 		return errors.New("invalid query format")
@@ -181,19 +181,19 @@ func TestHandleIssueCommentEvent(t *testing.T) {
 			name:   "correct title no-op",
 			re:     "^(fix:|feat:|major:).*$",
 			pr:     pr("fix: this is a valid title"),
-			labels: []string{labels.LGTM, labels.NeedsSig},
+			labels: []string{labels.LGTM},
 		},
 		{
 			name:   "wrong title no-op",
 			re:     "^(fix:|feat:|major:).*$",
 			pr:     pr("this title is wrong..."),
-			labels: []string{labels.LGTM, labels.NeedsSig, needsRetitleLabel},
+			labels: []string{labels.LGTM, needsRetitleLabel},
 		},
 		{
 			name:   "wrong title adds label",
 			re:     "^(fix:|feat:|major:).*$",
 			pr:     pr("this title is wrong..."),
-			labels: []string{labels.LGTM, labels.NeedsSig},
+			labels: []string{labels.LGTM},
 
 			expectedAdded: []string{needsRetitleLabel},
 			expectComment: true,
@@ -201,13 +201,13 @@ func TestHandleIssueCommentEvent(t *testing.T) {
 		{
 			name:   "wrong title no config ignores it",
 			pr:     pr("this title is wrong..."),
-			labels: []string{labels.LGTM, labels.NeedsSig},
+			labels: []string{labels.LGTM},
 		},
 		{
 			name:   "valid title removes label",
 			re:     "^(fix:|feat:|major:).*$",
 			pr:     pr("feat: this is valid title"),
-			labels: []string{labels.LGTM, labels.NeedsSig, needsRetitleLabel},
+			labels: []string{labels.LGTM, needsRetitleLabel},
 
 			expectedRemoved: []string{needsRetitleLabel},
 			expectDeletion:  true,
@@ -266,19 +266,19 @@ func TestHandlePullRequestEvent(t *testing.T) {
 			name:   "correct title no-op",
 			re:     "^(fix:|feat:|major:).*$",
 			title:  "fix: this is a valid title",
-			labels: []string{labels.LGTM, labels.NeedsSig},
+			labels: []string{labels.LGTM},
 		},
 		{
 			name:   "wrong title no-op",
 			re:     "^(fix:|feat:|major:).*$",
 			title:  "fixing: wrong title",
-			labels: []string{labels.LGTM, labels.NeedsSig, needsRetitleLabel},
+			labels: []string{labels.LGTM, needsRetitleLabel},
 		},
 		{
 			name:   "wrong title adds label",
 			re:     "^(fix:|feat:|major:).*$",
 			title:  "fixing: wrong title",
-			labels: []string{labels.LGTM, labels.NeedsSig},
+			labels: []string{labels.LGTM},
 
 			expectedAdded: []string{needsRetitleLabel},
 			expectComment: true,
@@ -286,13 +286,13 @@ func TestHandlePullRequestEvent(t *testing.T) {
 		{
 			name:   "wrong title, no config ignores it",
 			title:  "fixing: wrong title",
-			labels: []string{labels.LGTM, labels.NeedsSig},
+			labels: []string{labels.LGTM},
 		},
 		{
 			name:   "correct title removes label",
 			re:     "^(fix:|feat:|major:).*$",
 			title:  "major: this is a valid title",
-			labels: []string{labels.LGTM, labels.NeedsSig, needsRetitleLabel},
+			labels: []string{labels.LGTM, needsRetitleLabel},
 
 			expectedRemoved: []string{needsRetitleLabel},
 			expectDeletion:  true,
@@ -358,22 +358,22 @@ func TestHandleAll(t *testing.T) {
 	}{
 		{
 			title:  "fix: this is a valid title",
-			labels: []string{labels.LGTM, labels.NeedsSig},
+			labels: []string{labels.LGTM},
 		},
 		{
 			title:  "blah blah blah",
-			labels: []string{labels.LGTM, labels.NeedsSig, needsRetitleLabel},
+			labels: []string{labels.LGTM, needsRetitleLabel},
 		},
 		{
 			title:  "bleh bleh bleh",
-			labels: []string{labels.LGTM, labels.NeedsSig},
+			labels: []string{labels.LGTM},
 
 			expectedAdded: []string{needsRetitleLabel},
 			expectComment: true,
 		},
 		{
 			title:  "feat: this is a valid title",
-			labels: []string{labels.LGTM, labels.NeedsSig, needsRetitleLabel},
+			labels: []string{labels.LGTM, needsRetitleLabel},
 
 			expectedRemoved: []string{needsRetitleLabel},
 			expectDeletion:  true,
@@ -400,7 +400,12 @@ func TestHandleAll(t *testing.T) {
 	}
 	fake := newFakeClient(prs, nil, nil)
 	config := &plugins.Configuration{
-		Plugins: map[string][]string{"/": {labels.LGTM, PluginName}},
+		Plugins: plugins.Plugins{
+			"org": {
+				ExcludedRepos: []string{},
+				Plugins:       []string{PluginName},
+			},
+		},
 
 		ExternalPlugins: map[string][]plugins.ExternalPlugin{"/": {{Name: PluginName}}},
 	}
