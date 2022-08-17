@@ -8,17 +8,17 @@
   },
   "author": "belitre",
   "devDependencies": {
-    "@semantic-release/commit-analyzer": "^8.0.1",
-    "@semantic-release/exec": "^5.0.0",
-    "@semantic-release/github": "^7.2.1",
-    "@semantic-release/release-notes-generator": "^9.0.2",
-    "env-ci": "^5.0.2",
+    "@semantic-release/commit-analyzer": "^9.0.2",
+    "@semantic-release/exec": "^6.0.3",
+    "@semantic-release/github": "^8.0.5",
+    "@semantic-release/release-notes-generator": "^10.0.3",
+    "env-ci": "^7.3.0",
     "fstream": "^1.0.12",
-    "https-proxy-agent": "^5.0.0",
+    "https-proxy-agent": "^5.0.1",
     "kind-of": ">=6.0.3",
     "npm": "^7.8.0",
-    "semantic-release": "^17.4.2",
-    "tar": "^6.1.0"
+    "semantic-release": "^19.0.3",
+    "tar": "^6.1.11"
   },
   "release": {
     "plugins": [
@@ -79,8 +79,8 @@
     "access": "restricted"
   },
   "dependencies": {
-    "npm": ">=6.14.6",
-    "npm-check-updates": "^11.3.0",
-    "npm-registry-fetch": ">=9.0.0"
+    "npm": ">=8.17.0",
+    "npm-check-updates": "^16.0.5",
+    "npm-registry-fetch": ">=13.3.1"
   }
 }
