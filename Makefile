@@ -9,7 +9,7 @@ LDFLAGS := -extldflags "-static"
 
 BUILD_PATH = github.com/ouzi-dev/needs-retitle
 
-GOLANG_VERSION := 1.14.2
+GOLANG_VERSION := 1.18.5
 
 HAS_GOX := $(shell command -v gox;)
 HAS_GO_IMPORTS := $(shell command -v goimports;)
